@@ -62,6 +62,9 @@ uint8_t displayStep = 0;
 e_rvb baseColor = rvb_red;
 uint16_t speedAnim = 200;
 
+bool sleepOk = true;
+
+
 #include <EEPROM.h>
 
 
@@ -85,7 +88,7 @@ void setup() {
 // the loop function runs over and over again forever
 void loop() {
 
-  Events.get();     // get standart event
+  Events.get(sleepOk);     // get standart event
   Events.handle();  // handle standart event
 
   switch (Events.code) {
@@ -133,7 +136,7 @@ void loop() {
 
 
           case evxOn:
-
+            mode_t oldDisplay = displayMode;
             Serial.println(F("BP0 Down"));
             if (displayMode) {
               displayMode = (mode_t)( (displayMode + 1) % MAXmode );
@@ -141,16 +144,25 @@ void loop() {
               getDisplayMode();
               if (displayMode == modeOff) displayMode = modeFeu;
             }
+
+            if (oldDisplay != displayMode) Events.delayedPush(5000, evSaveDisplayMode);
+            Events.removeDelayEvent(evNextAnim);
             if (displayMode) {
-              Events.delayedPush(5000, evSaveDisplayMode);
               if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
               Events.push(evStartAnim);
+
             }
             break;
 
 
 
 
+        }
+      }
+      case evInChar: {
+        if (Keyboard.inputChar == 'S') {
+          sleepOk = !sleepOk;
+          D_println(sleepOk);
         }
       }
   }
@@ -214,23 +226,23 @@ void nextAnim() {
       break;
 
     case modeTerre:
- 
-     if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N+=2) {
+
+      if (displayStep == 0) {
+        for (uint8_t N = 0; N < ledsMAX; N += 2) {
           leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 2);
         }
-     }
-     if (displayStep == 4) {
-        for (uint8_t N = 1; N < ledsMAX; N+=2) {
+      }
+      if (displayStep == 4) {
+        for (uint8_t N = 1; N < ledsMAX; N += 2) {
           leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 1);
         }
-      
-     }
-      
+
+      }
+
       break;
 
     case modeLumiere:
-         if (displayStep == 0) {
+      if (displayStep == 0) {
         for (uint8_t N = 0; N < ledsMAX; N++) {
           leds[N].setcolor(baseColor, 100, 50, 1);
         }
@@ -239,7 +251,7 @@ void nextAnim() {
       break;
 
     case modeTenebre:
-        if (displayStep == 0) {
+      if (displayStep == 0) {
         for (uint8_t N = 0; N < ledsMAX; N++) {
           leds[N].setcolor(baseColor, 100, 1, speedAnim * 5);
         }
@@ -248,9 +260,11 @@ void nextAnim() {
 
 
   }
-  displayStep++;
-  if (displayStep >= ledsMAX) displayStep = 0;
-  Events.delayedPush(speedAnim, evNextAnim);
+  if (displayMode) {
+    displayStep++;
+    if (displayStep >= ledsMAX) displayStep = 0;
+    Events.delayedPush(speedAnim, evNextAnim);
+  }
 
 }
 
