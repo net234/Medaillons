@@ -30,7 +30,7 @@
 
 //#define PIN_WS2812 D2
 
-enum e_rvb { rvb_white, rvb_red, rvb_green, rvb_blue, rvb_yellow, rvb_pink, rvb_brown, rvb_orange, rvb_lightblue, rvb_lightgreen, rvb_blouge1, rvb_blouge2, rvb_blouge3, rvb_black, MAX_e_rvb };
+enum e_rvb { rvb_white, rvb_red, rvb_green, rvb_blue, rvb_yellow, rvb_pink, rvb_brown, rvb_orange, rvb_lightblue, rvb_lightgreen,  rvb_purple, rvb_black, MAX_e_rvb };
 
 
 
@@ -67,9 +67,7 @@ const rvb_t map_color[MAX_e_rvb] = {
   {200,  50,   0}, // rvb_orange
   { 50,  50, 200}, // rvb_lightblue
   { 50, 200,  50}, // rvb_lightgreen
-  { 100, 0 , 155 },// rvb_blouge1
-  { 70, 0 , 185 }, // rvb_blouge2
-  { 50, 0 , 205 }, // rvb_blouge3
+  {150,   0, 150}, // rvb_purple
   {  0,   0,   0}, // rvb_black
 };
 

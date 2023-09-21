@@ -21,10 +21,10 @@
 //---------------------
 
 // affectation des pattes pour bandeau
-#define LED_LIFE  LED_BUILTIN
+#define LED0_PIN  LED_BUILTIN
 #define LED_ON  HIGH
 
-#define PIN_BP0 D7
+#define BP0_PIN D7
 #define PIN_WS2812 D8  //Uniquement D8..D13
 //---------------------
 

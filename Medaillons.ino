@@ -28,162 +28,257 @@
 
 
 #include <Arduino.h>
+#include "nano.h"
+
+
+#define APP_VERSION "Medaillon V1.0"
+
+//enum typeEvent { evNill=0, ev100Hz, ev10Hz, ev1Hz, ev24H, evInChar,evInString,evUser=99 };
+enum myEvent {
+  evBP0 = 100,
+  evLed0,
+  evSaveDisplayMode,
+  evDisplayOff,
+  evStartAnim,
+  evNextAnim,
+};
+
+// Gestionaire d'evenemnt
+#define DEBUG_ON
+#include <BetaEvents.h>
 #include "WS2812.h"
 
-uint8_t div10Hz = 10;
-uint8_t div1Hz = 10;
-uint16_t divAnime = 250;
 
 // varibale modifiables
 const uint8_t  ledsMAX = 7;  // nombre de led sur le bandeau
-const uint16_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = pas d'autoextinction)
+const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = pas d'autoextinction)
 // varibale modifiables (fin)
 
 // Array contenant les leds du medaillon
 WS2812rvb_t leds[ledsMAX + 1];
 
-uint16_t delayModeOff = autoOffDelay;
 enum mode_t { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, MAXmode}  displayMode = modeFeu;
 uint8_t displayStep = 0;
-uint8_t delayMemo = 0;
+e_rvb baseColor = rvb_red;
+uint16_t speedAnim = 200;
 
 #include <EEPROM.h>
 
 
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
-  Serial.begin(115200);
-  Serial.println("Bonjour");
-  pinMode(LED_LIFE, OUTPUT);
-  pinMode(PIN_BP0, INPUT_PULLUP);
+  //Serial.begin(115200);
+  //Serial.println("Bonjour");
+  Events.begin();
+  Serial.println(F(APP_VERSION));
+
   pinMode(PIN_WS2812, OUTPUT);
   for (uint8_t N = 0; N < ledsMAX; N++) {
-    leds[N].setcolor(rvb_white, 80, 1000, 1000);
+    leds[N].setcolor(rvb_white, 80, 2000, 2000);
   }
 
-  // lecture de  l'EEPROM pour le choix de l'animation
-  // check if a stored value
-  if (EEPROM.read(1) == 'B') {
-    displayMode = (mode_t)EEPROM.read(2);
-    Serial.print("Saved Anime ");
-    Serial.println(displayMode);
-
-    if (displayMode >= MAXmode ) displayMode = modeOff;
-    EEPROM.write(1, 'B');
-    EEPROM.write(2, displayMode);
-  }
+  getDisplayMode();
 }
 
-uint32_t milli1 = millis();  // heure du dernier 100Hz obtenus
-bool ledLifeStat = true;
-bool bp0Stat = false;
+
 
 // the loop function runs over and over again forever
 void loop() {
 
-  // detection de 10milliseconde pour btenir du 100Hz
-  uint16_t delta = millis() - milli1;
-  if (  delta >= 10 ) {
-    milli1 += 10;
+  Events.get();     // get standart event
+  Events.handle();  // handle standart event
 
-    // 100 Hzt rafraichissement bandeau
-    jobRefreshLeds(10);
+  switch (Events.code) {
 
-    // diviseur pour avoir du 10Hz
-    if (--div10Hz == 0) {
-      // 10 Hzt
-      div10Hz = 10;
+    case evInit:
+      Serial.println(F("Init Ok"));
+      if (displayMode != modeOff) {
+        Events.delayedPush(5000, evStartAnim);
+        if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay + 5000, evDisplayOff);
+      }
 
-      //10HZ test poussoir
-      jobPoussoir();
-
-      // diviseur pour avoir du 1HZ
-      if (--div1Hz == 0) {
-        div1Hz = 10;
-
-        // job 1 Hz
-        ledLifeStat = !ledLifeStat;
-        digitalWrite(LED_LIFE, ledLifeStat);   // turn the LED on (HIGH is the voltage level)
-
-        if (delayModeOff) {
-          if (--delayModeOff == 0) {
-            displayMode = modeOff;
-          }
-        }
-        if (delayMemo) {
-          delayMemo--;
-          if (delayMemo == 0) {
-            EEPROM.update(1, 'B');
-            EEPROM.update(2, displayMode);
-            Serial.print("Save Anime ");
-            Serial.println(displayMode);
-          }
-        }
-
-      }  // 1Hz
-    } // 10Hz
+      break;
 
 
-    // annimation toute
-    if (--divAnime == 0) {
-      divAnime = 200;  // change de led chaque divanime centime de sec
+    case ev100Hz:
+      // refresh led
+      jobRefreshLeds(10);
 
-      // animation
-      if (displayStep < ledsMAX) {
-        switch (displayMode) {
-          case modeOff:
-            leds[displayStep].setcolor(rvb_black, 50);
+      break;
+
+    case evSaveDisplayMode:
+      setDisplayMode();
+      break;
+
+
+    case evDisplayOff:
+      displayMode = modeOff;
+      break;
+
+    case evStartAnim:
+      startAnim();
+      break;
+
+    case evNextAnim:
+      nextAnim();
+      break;
+
+    case evBP0: {
+
+        switch (Events.ext) {
+
+          case evxOff:
+            Serial.println(F("BP0 Up"));
             break;
-          case modeFeu:
 
-            leds[displayStep].setcolor(rvb_red, 80, 2000, 2000);
 
+          case evxOn:
+
+            Serial.println(F("BP0 Down"));
+            if (displayMode) {
+              displayMode = (mode_t)( (displayMode + 1) % MAXmode );
+            } else {
+              getDisplayMode();
+              if (displayMode == modeOff) displayMode = modeFeu;
+            }
+            if (displayMode) {
+              Events.delayedPush(5000, evSaveDisplayMode);
+              if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
+              Events.push(evStartAnim);
+            }
             break;
-          case modeGlace:
-            leds[displayStep].setcolor(rvb_blue, 80, 4000, 4000);
-            break;
-          case modeVent:
-            leds[displayStep].setcolor(rvb_green, 80, 100, 100);
-            break;
+
+
+
+
         }
       }
-      displayStep = (displayStep + 1) % (ledsMAX);
+  }
 
-    }
-  } // 100Hz
 
   //delay(1);
 }
 
-
-
-void jobPoussoir() {
-  if ( (digitalRead(PIN_BP0) == LOW) != bp0Stat ) {
-    bp0Stat = !bp0Stat;
-    if (bp0Stat) {
-      delayMemo = 5;
-      Serial.print("delay memo");
-    } else {
-      displayMode = (mode_t)( (displayMode + 1) % 4 );
-      delayModeOff = autoOffDelay;
-      displayStep = 0;
-      delayMemo = 0;
-    }
+void startAnim() {
+  displayStep = 0;
+  Events.push(evNextAnim);
+  switch (displayMode) {
+    case modeFeu:
+      baseColor = rvb_red;
+      speedAnim = 300;
+      break;
+    case modeGlace:
+      baseColor = rvb_blue;
+      speedAnim = 800;
+      break;
+    case modeVent:
+      baseColor = rvb_green;
+      speedAnim = 80;
+      break;
+    case modeTerre:
+      baseColor = rvb_orange;
+      speedAnim = 300;
+      break;
+    case modeLumiere:
+      baseColor = rvb_white;
+      speedAnim = 50;
+      break;
+    case modeTenebre:
+      baseColor = rvb_purple;
+      speedAnim = 300;
+      break;
 
 
   }
 }
 
+void nextAnim() {
+  switch (displayMode) {
+    case modeFeu:
+      if (displayStep < 4) {
+        leds[displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
+        leds[7 - displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
+      }
+      break;
+    case modeGlace:
+      if (displayStep == 0) {
+        for (uint8_t N = 0; N < ledsMAX; N++) {
+          leds[N].setcolor(baseColor, 90, speedAnim * 6, speedAnim * 1);
+        }
+
+      }
+
+      break;
+    case modeVent:
+      leds[displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
+      break;
+
+    case modeTerre:
+ 
+     if (displayStep == 0) {
+        for (uint8_t N = 0; N < ledsMAX; N+=2) {
+          leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 2);
+        }
+     }
+     if (displayStep == 4) {
+        for (uint8_t N = 1; N < ledsMAX; N+=2) {
+          leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 1);
+        }
+      
+     }
+      
+      break;
+
+    case modeLumiere:
+         if (displayStep == 0) {
+        for (uint8_t N = 0; N < ledsMAX; N++) {
+          leds[N].setcolor(baseColor, 100, 50, 1);
+        }
+
+      }
+      break;
+
+    case modeTenebre:
+        if (displayStep == 0) {
+        for (uint8_t N = 0; N < ledsMAX; N++) {
+          leds[N].setcolor(baseColor, 100, 1, speedAnim * 5);
+        }
+
+      }      break;
+
+
+  }
+  displayStep++;
+  if (displayStep >= ledsMAX) displayStep = 0;
+  Events.delayedPush(speedAnim, evNextAnim);
+
+}
+
+
+
+void  getDisplayMode() {
+  // lecture de  l'EEPROM pour le choix de l'animation
+  displayMode = modeOff;
+  // check if a stored value
+  if (EEPROM.read(1) == 'B') {
+    displayMode = (mode_t)EEPROM.read(2);
+    TD_println("Saved Anime", displayMode);
+
+    if (displayMode >= MAXmode ) displayMode = modeOff;
+  }
+}
+
+void setDisplayMode() {
+  EEPROM.update(1, 'B');
+  EEPROM.update(2, displayMode);
+  TD_println("Save Anime ", displayMode);
+}
 
 // 100 HZ
 void jobRefreshLeds(const uint8_t delta) {
   for (int8_t N = 0; N < ledsMAX; N++) {
     leds[N].write();
   }
-  //  option mode mirroir
-  //  for (int8_t N = ledsMAX - 1; N > 0; N--) {
-  //    leds[N].write();
-  //  }
   leds[0].reset(); // obligatoire
 
   for (uint8_t N = 0; N < ledsMAX; N++) {
