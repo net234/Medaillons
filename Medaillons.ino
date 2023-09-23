@@ -37,7 +37,7 @@
 enum myEvent {
   evBP0 = 100,
   evLed0,
-  evSaveDisplayMode,
+  //evSaveDisplayMode,
   evDisplayOff,
   evStartAnim,
   evNextAnim,
@@ -69,7 +69,7 @@ bool sleepOk = true;
 
 
 void setup() {
-  // initialize digital pin LED_BUILTIN as an output.
+
   //Serial.begin(115200);
   //Serial.println("Bonjour");
   Events.begin();
@@ -81,13 +81,15 @@ void setup() {
   }
 
   getDisplayMode();
+
+  nrfSetup();
 }
 
 
 
 // the loop function runs over and over again forever
 void loop() {
-
+  nrfHandle();
   Events.get(sleepOk);     // get standart event
   Events.handle();  // handle standart event
 
@@ -109,9 +111,7 @@ void loop() {
 
       break;
 
-    case evSaveDisplayMode:
-      setDisplayMode();
-      break;
+
 
 
     case evDisplayOff:
@@ -119,6 +119,7 @@ void loop() {
       break;
 
     case evStartAnim:
+      if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
       startAnim();
       break;
 
@@ -132,34 +133,37 @@ void loop() {
 
           case evxOff:
             Serial.println(F("BP0 Up"));
-            break;
-
-
-          case evxOn:
-            mode_t oldDisplay = displayMode;
-            Serial.println(F("BP0 Down"));
             if (displayMode) {
               displayMode = (mode_t)( (displayMode + 1) % MAXmode );
             } else {
               getDisplayMode();
-              if (displayMode == modeOff) displayMode = modeFeu;
+
             }
 
-            if (oldDisplay != displayMode) Events.delayedPush(5000, evSaveDisplayMode);
+            if (displayMode == modeOff) displayMode = modeFeu;
             Events.removeDelayEvent(evNextAnim);
-            if (displayMode) {
-              if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
-              Events.push(evStartAnim);
-
-            }
+            if (displayMode) Events.push(evStartAnim);
+            TD_println("Current displayMode ", displayMode);
+            nrfSend(1);
             break;
 
 
+          case evxOn:
+
+            Serial.println(F("BP0 Down"));
+
+
+            break;
+
+          case evxLongOn:
+            Serial.println(F("BP0 Long On"));
+            saveDisplayMode();
+            break;
 
 
         }
       }
-      case evInChar: {
+    case evInChar: {
         if (Keyboard.inputChar == 'S') {
           sleepOk = !sleepOk;
           D_println(sleepOk);
@@ -193,7 +197,7 @@ void startAnim() {
       break;
     case modeLumiere:
       baseColor = rvb_white;
-      speedAnim = 50;
+      speedAnim = 300;
       break;
     case modeTenebre:
       baseColor = rvb_purple;
@@ -244,7 +248,7 @@ void nextAnim() {
     case modeLumiere:
       if (displayStep == 0) {
         for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 100, 50, 1);
+          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
         }
 
       }
@@ -276,16 +280,16 @@ void  getDisplayMode() {
   // check if a stored value
   if (EEPROM.read(1) == 'B') {
     displayMode = (mode_t)EEPROM.read(2);
-    TD_println("Saved Anime", displayMode);
+    TD_println("Saved displayMode", displayMode);
 
     if (displayMode >= MAXmode ) displayMode = modeOff;
   }
 }
 
-void setDisplayMode() {
+void saveDisplayMode() {
   EEPROM.update(1, 'B');
   EEPROM.update(2, displayMode);
-  TD_println("Save Anime ", displayMode);
+  TD_println("Save displayMode ", displayMode);
 }
 
 // 100 HZ
