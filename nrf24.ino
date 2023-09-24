@@ -4,16 +4,26 @@
 const byte radioname[6] = "Meda1";
 //construction  d'un uuid unique a partir de l'heure et la date de compil
 #define BUILDTIME __TIME__ " " __DATE__
-const byte buidtime[] = BUILDTIME;
-const unsigned int  appUID = (buidtime[7] & 0x0F) | ((buidtime[4] & 0x0F) << 4) | ((buidtime[1] & 0x0F) << 8) | ((buidtime[14] & 0x0F) << 12) ;  //ID:33289
+const byte buidtime[] = BUILDTIME;  //BUILDTIME => '15:52:28 Sep 24 2023
+//                                    u sec                                   u min                         u heure                    u day
+const unsigned int  appUID = ((buidtime[6]+buidtime[7]) & 0x0F) | 
+                           ( ((buidtime[3]+buidtime[4]) & 0x0F) << 4) | 
+                           ( ((buidtime[0]+buidtime[1]) & 0x0F) << 8) |
+                           ( ((buidtime[13]+buidtime[14]) & 0x0F) << 12) ;  //ID:33289
 
 
 
 //* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 10 & 9 * /
 RF24 radio(10, 9);
 
+byte messNum = 0;
+
+
 struct RadioEvent  {
+  byte  num;
   unsigned int  who;
+  unsigned int  from;
+  
   byte  what;
   int action;
 };
@@ -35,6 +45,8 @@ void nrfSetup() {
   radio.setPayloadSize(sizeof(RadioEvent));
   Serial.print("Payload Size:");
   Serial.print(sizeof(RadioEvent));
+  D_print(appUID);
+  D_print(BUILDTIME);
   Serial.println();
   // radio.setDataRate(RF24_250KBPS);
   radio.setAutoAck(false);
@@ -57,6 +69,7 @@ void nrfSetup() {
     Serial.println("!! NRF24L01 ABSENT");
   }
   radio.disableSPI();
+  messNum = 0;
 }
 
 
@@ -71,29 +84,65 @@ void nrfHandle() {
 
   // Si un evenemnt est recu
   if (radio.available())  {
-      //Serial.println("Radio");
-      //  digitalWrite(6, true);
-      radio.read( &receveRadioEvent, sizeof(receveRadioEvent) );
-    
-        Serial.print("\r\n[<=");
-        D_print(receveRadioEvent.who);
-        D_print(receveRadioEvent.what);
-        Serial.print("]");
-     if (receveRadioEvent.what == 1) {
-      displayMode = receveRadioEvent.action;
-      Events.push(evStartAnim);
-     }
+    //Serial.println("Radio");
+    //  digitalWrite(6, true);
+    radio.read( &receveRadioEvent, sizeof(receveRadioEvent) );
 
+    Serial.print("Radio\r\n[<=");
+    D_print(receveRadioEvent.num);
+    TD_print("Who",receveRadioEvent.who);
+    TD_print("From",receveRadioEvent.from);
+    TD_print("What",receveRadioEvent.what);
+    TD_print("Action",receveRadioEvent.action);
+    
+
+    Serial.print("] ");
+    if (receveRadioEvent.who == appUID) {
+      Serial.println("ack");
+    } else {
+      if (receveRadioEvent.num == messNum) {
+        Serial.println("dub");
+      } else {
+        messNum = receveRadioEvent.num;
+        if (receveRadioEvent.what == 1) {
+          displayMode = receveRadioEvent.action;
+          TD_println("Distant StartAnim", displayMode);
+          Events.push(evStartAnim);
+        }
+        if (receveRadioEvent.what == evWhoIsHere) {
+       
+          TD_println("Request Who is there", appUID);
+          Events.delayedPush(random(110,150),evIamHere);
+        }
+        Events.delayedPush(random(2, 11), evAckRadio);
+      }
     }
+
+  }
   radio.disableSPI();
   digitalWrite(13, SD13);
   // digitalWrite(6, false);
 }
 
+void nrfAck() {
+  Serial.println("send ack");
+  bool SD13 = digitalRead(13);
+  radio.enableSPI();
+  receveRadioEvent.from=appUID;
+  radio.stopListening();
+  radio.write( &receveRadioEvent, sizeof(receveRadioEvent), true );
+  radio.startListening();
+  radio.disableSPI();
+  digitalWrite(13, SD13);
+
+}
 
 void  nrfSend(byte what) {
-
+  TD_print("Send UUID",appUID);
+  TD_print(,what);
+  transmitRadioEvent.num = ++messNum;
   transmitRadioEvent.who = appUID;
+  transmitRadioEvent.from=appUID;
   transmitRadioEvent.what = what;
   transmitRadioEvent.action = displayMode;
   bool SD13 = digitalRead(13);

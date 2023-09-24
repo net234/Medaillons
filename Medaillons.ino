@@ -41,6 +41,9 @@ enum myEvent {
   evDisplayOff,
   evStartAnim,
   evNextAnim,
+  evAckRadio,
+  evWhoIsHere,
+  evIamHere,
 };
 
 // Gestionaire d'evenemnt
@@ -127,6 +130,13 @@ void loop() {
       nextAnim();
       break;
 
+
+      case evIamHere:
+      Serial.println(F("Send evIamHere"));
+      nrfSend(evIamHere);
+      break;
+      
+
     case evBP0: {
 
         switch (Events.ext) {
@@ -162,12 +172,29 @@ void loop() {
 
 
         }
+        break;
       }
+    case evAckRadio: {
+        nrfAck();
+        break;
+      }
+    case evWhoIsHere: {
+        nrfSend(evWhoIsHere);
+        break;
+      }
+
     case evInChar: {
         if (Keyboard.inputChar == 'S') {
           sleepOk = !sleepOk;
           D_println(sleepOk);
         }
+        if (Keyboard.inputChar == 'W') {
+
+          T_println("Who ?");
+          Events.push(evWhoIsHere);
+        }
+
+        break;
       }
   }
 
