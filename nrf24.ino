@@ -5,12 +5,10 @@ const byte radioname[6] = "Meda1";
 //construction  d'un uuid unique a partir de l'heure et la date de compil
 #define BUILDTIME __TIME__ " " __DATE__
 const byte buidtime[] = BUILDTIME;  //BUILDTIME => '15:52:28 Sep 24 2023
-//                                    u sec                                   u min                         u heure                    u day
-const unsigned int  appUID = ((buidtime[6]+buidtime[7]) & 0x0F) | 
-                           ( ((buidtime[3]+buidtime[4]) & 0x0F) << 4) | 
-                           ( ((buidtime[0]+buidtime[1]) & 0x0F) << 8) |
-                           ( ((buidtime[13]+buidtime[14]) & 0x0F) << 12) ;  //ID:33289
-
+const unsigned int  appUID = ((buidtime[6]+buidtime[7]) & 0x0F) |          // sec
+                           ( ((buidtime[3]+buidtime[4]) & 0x0F) << 4) |    // min
+                           ( ((buidtime[0]+buidtime[1]) & 0x0F) << 8) |    // heu
+                           ( ((buidtime[13]+buidtime[14]) & 0x0F) << 12) ;  // day
 
 
 //* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 10 & 9 * /
@@ -48,7 +46,7 @@ void nrfSetup() {
   D_print(appUID);
   D_print(BUILDTIME);
   Serial.println();
-  // radio.setDataRate(RF24_250KBPS);
+  radio.setDataRate(RF24_250KBPS);
   radio.setAutoAck(false);
   // radio.maskIRQ(0, 0, 0);
   // Start the radio listening for data

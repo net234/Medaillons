@@ -131,11 +131,11 @@ void loop() {
       break;
 
 
-      case evIamHere:
+    case evIamHere:
       Serial.println(F("Send evIamHere"));
       nrfSend(evIamHere);
       break;
-      
+
 
     case evBP0: {
 
@@ -194,6 +194,12 @@ void loop() {
           Events.push(evWhoIsHere);
         }
 
+        if (Keyboard.inputChar == 'P') {
+
+          TD_println("Current displayMode ", displayMode);
+          nrfSend(1);
+        }
+
         break;
       }
   }
@@ -219,7 +225,7 @@ void startAnim() {
       speedAnim = 80;
       break;
     case modeTerre:
-      baseColor = rvb_orange;
+      baseColor = rvb_brown;
       speedAnim = 300;
       break;
     case modeLumiere:
@@ -228,7 +234,7 @@ void startAnim() {
       break;
     case modeTenebre:
       baseColor = rvb_purple;
-      speedAnim = 300;
+      speedAnim = 500;
       break;
 
 
@@ -273,18 +279,20 @@ void nextAnim() {
       break;
 
     case modeLumiere:
-      if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
-        }
+        leds[6-displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
 
-      }
+//      if (displayStep == 0) {
+//        for (uint8_t N = 0; N < ledsMAX; N++) {
+//          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
+//        }
+//
+//     }
       break;
 
     case modeTenebre:
       if (displayStep == 0) {
         for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 100, 1, speedAnim * 5);
+          leds[N].setcolor(baseColor, 100, speedAnim, speedAnim * 5);
         }
 
       }      break;
