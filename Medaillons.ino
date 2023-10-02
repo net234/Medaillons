@@ -1,4 +1,4 @@
-/*
+/**************************************************************************************
   Medaillons.ino
 
    Gestion d'un bandeau WS2812 pour faire un medaillon annimé
@@ -22,7 +22,8 @@
   History
    V1.0 (30/10/2021)
    - Full rebuild from Bandeau  01/2021 net234
-
+   V1.1 (29/09/2022)
+   - Ajustement pour version Meluze
 
 *************************************************/
 
@@ -31,7 +32,7 @@
 #include "nano.h"
 
 
-#define APP_VERSION "Medaillon V1.0"
+#define APP_VERSION "Medaillon V1.1"
 
 //enum typeEvent { evNill=0, ev100Hz, ev10Hz, ev1Hz, ev24H, evInChar,evInString,evUser=99 };
 enum myEvent {
@@ -58,15 +59,24 @@ const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = 
 // varibale modifiables (fin)
 
 // Array contenant les leds du medaillon
-WS2812rvb_t leds[ledsMAX + 1];
 
-enum mode_t { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, MAXmode}  displayMode = modeFeu;
-uint8_t displayStep = 0;
-e_rvb baseColor = rvb_red;
+
+
+
+
+enum mode_t { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, maxMode}  currentMode = modeFeu;
+uint8_t displayStep = 0;  // Etape en cours dans l'anime
+e_rvb baseColor = rvb_red;  // Couleur base de l'animation
+//uint16_t dureeAnim
 uint16_t speedAnim = 200;
+mode_t displayMode1;
+mode_t displayMode2;
+byte currentAnime;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
 
 bool sleepOk = true;
 
+
+WS2812rvb_t leds[ledsMAX + 1];
 
 #include <EEPROM.h>
 
@@ -100,10 +110,8 @@ void loop() {
 
     case evInit:
       Serial.println(F("Init Ok"));
-      if (displayMode != modeOff) {
-        Events.delayedPush(5000, evStartAnim);
-        if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay + 5000, evDisplayOff);
-      }
+      Events.delayedPush(5000, evStartAnim);
+      if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay + 5000, evDisplayOff);
 
       break;
 
@@ -118,7 +126,7 @@ void loop() {
 
 
     case evDisplayOff:
-      displayMode = modeOff;
+      currentMode = modeOff;
       break;
 
     case evStartAnim:
@@ -143,24 +151,22 @@ void loop() {
 
           case evxOff:
             Serial.println(F("BP0 Up"));
-            if (displayMode) {
-              displayMode = (mode_t)( (displayMode + 1) % MAXmode );
-            } else {
-              getDisplayMode();
-
-            }
-
-            if (displayMode == modeOff) displayMode = modeFeu;
-            Events.removeDelayEvent(evNextAnim);
-            if (displayMode) Events.push(evStartAnim);
-            TD_println("Current displayMode ", displayMode);
-            nrfSend(1);
             break;
 
 
           case evxOn:
 
             Serial.println(F("BP0 Down"));
+            if (currentMode) {
+              currentMode = modeOff;
+            } else {
+              currentMode = displayMode1;
+            }
+
+            Events.removeDelayEvent(evNextAnim);
+            if (currentMode) Events.push(evStartAnim);
+            TD_println("Current Mode ", currentMode);
+            nrfSend(1);
 
 
             break;
@@ -184,6 +190,17 @@ void loop() {
       }
 
     case evInChar: {
+        if (Keyboard.inputChar == '1') {
+          displayMode1 = modeLumiere;
+          displayMode2 = modeVent;
+        }
+
+        if (Keyboard.inputChar == '2') {
+          displayMode1 = modeTenebre;
+          displayMode2 = modeTerre;
+        }
+
+      
         if (Keyboard.inputChar == 'S') {
           sleepOk = !sleepOk;
           D_println(sleepOk);
@@ -196,7 +213,7 @@ void loop() {
 
         if (Keyboard.inputChar == 'P') {
 
-          TD_println("Current displayMode ", displayMode);
+          TD_println("Current Mode ", currentMode);
           nrfSend(1);
         }
 
@@ -210,8 +227,17 @@ void loop() {
 
 void startAnim() {
   displayStep = 0;
+  D_println(currentAnime);
+  currentAnime++;
+  currentMode = displayMode1;
+  if (currentAnime == 2) {
+    currentAnime = 0;
+    if (displayMode2) currentMode = displayMode2;
+  }
+  TD_print("Start Anim",currentMode);
+  D_println(currentAnime);
   Events.push(evNextAnim);
-  switch (displayMode) {
+  switch (currentMode) {
     case modeFeu:
       baseColor = rvb_red;
       speedAnim = 300;
@@ -242,7 +268,8 @@ void startAnim() {
 }
 
 void nextAnim() {
-  switch (displayMode) {
+  //D_println(displayStep);
+  switch (currentMode) {
     case modeFeu:
       if (displayStep < 4) {
         leds[displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
@@ -279,14 +306,14 @@ void nextAnim() {
       break;
 
     case modeLumiere:
-        leds[6-displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
+      leds[6 - displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
 
-//      if (displayStep == 0) {
-//        for (uint8_t N = 0; N < ledsMAX; N++) {
-//          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
-//        }
-//
-//     }
+      //      if (displayStep == 0) {
+      //        for (uint8_t N = 0; N < ledsMAX; N++) {
+      //          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
+      //        }
+      //
+      //     }
       break;
 
     case modeTenebre:
@@ -299,10 +326,13 @@ void nextAnim() {
 
 
   }
-  if (displayMode) {
-    displayStep++;
-    if (displayStep >= ledsMAX) displayStep = 0;
-    Events.delayedPush(speedAnim, evNextAnim);
+  if (currentMode) {
+    if (displayStep < ledsMAX-1) {
+      displayStep++;
+      Events.delayedPush(speedAnim, evNextAnim);
+    } else {
+      Events.delayedPush(speedAnim, evStartAnim);
+    }
   }
 
 }
@@ -311,20 +341,26 @@ void nextAnim() {
 
 void  getDisplayMode() {
   // lecture de  l'EEPROM pour le choix de l'animation
-  displayMode = modeOff;
+  currentMode = 0;
+  displayMode1 = modeLumiere;
+  displayMode2 = modeOff;
   // check if a stored value
   if (EEPROM.read(1) == 'B') {
-    displayMode = (mode_t)EEPROM.read(2);
-    TD_println("Saved displayMode", displayMode);
-
-    if (displayMode >= MAXmode ) displayMode = modeOff;
+    displayMode1 = (mode_t)EEPROM.read(2);
+    if (displayMode1 == 0 or displayMode1 > maxMode) displayMode1 = modeLumiere;
+    TD_println("Saved displayMode1", displayMode1);
+    displayMode2 = (mode_t)EEPROM.read(3);
+    if (displayMode2 > maxMode) displayMode2 = modeOff;
+    TD_println("Saved displayMode2", displayMode2);
   }
 }
 
 void saveDisplayMode() {
   EEPROM.update(1, 'B');
-  EEPROM.update(2, displayMode);
-  TD_println("Save displayMode ", displayMode);
+  EEPROM.update(2, displayMode1);
+  TD_println("Save displayMode1 ", displayMode1);
+  EEPROM.update(3, displayMode2);
+  TD_println("Save displayMode2 ", displayMode2);
 }
 
 // 100 HZ

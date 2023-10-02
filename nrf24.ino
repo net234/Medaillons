@@ -23,7 +23,8 @@ struct RadioEvent  {
   unsigned int  from;
   
   byte  what;
-  int action;
+  byte mode1;
+  byte mode2;
 };
 
 
@@ -91,7 +92,8 @@ void nrfHandle() {
     TD_print("Who",receveRadioEvent.who);
     TD_print("From",receveRadioEvent.from);
     TD_print("What",receveRadioEvent.what);
-    TD_print("Action",receveRadioEvent.action);
+    TD_print("Mode1",receveRadioEvent.mode1);
+    TD_print("Mode2",receveRadioEvent.mode2);
     
 
     Serial.print("] ");
@@ -103,8 +105,11 @@ void nrfHandle() {
       } else {
         messNum = receveRadioEvent.num;
         if (receveRadioEvent.what == 1) {
-          displayMode = receveRadioEvent.action;
-          TD_println("Distant StartAnim", displayMode);
+          displayMode1 = receveRadioEvent.mode1;
+          displayMode2 = receveRadioEvent.mode2;
+          currentMode = 0;
+          TD_print("Distant Mode1", displayMode1);
+          TD_println("Mode2", displayMode2);
           Events.push(evStartAnim);
         }
         if (receveRadioEvent.what == evWhoIsHere) {
@@ -142,7 +147,8 @@ void  nrfSend(byte what) {
   transmitRadioEvent.who = appUID;
   transmitRadioEvent.from=appUID;
   transmitRadioEvent.what = what;
-  transmitRadioEvent.action = displayMode;
+  transmitRadioEvent.mode1 = displayMode1;
+  transmitRadioEvent.mode2 = displayMode2;
   bool SD13 = digitalRead(13);
   radio.enableSPI();
 
