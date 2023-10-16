@@ -43,6 +43,7 @@ enum myEvent {
   evStartAnim,   //Allumage Avec l'animation Mode1 et activation de l'extinction automatique
   evNextAnim,    //L'anime est fini on repete ou on fait la suivante
   evNextStep,    //etape suivante dans l'animation
+  //evModeProg1,    // choix du programe1
   evSendModeRadio, // send actual mode
   evAckRadio,    //Ack d'un event radio
   evWhoIsHere,   //Demande radio d'identification
@@ -66,21 +67,25 @@ const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = 
 
 
 
-enum mode_t { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, maxMode}  currentMode = modeFeu;
+enum mode_t : byte { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, maxMode}  currentMode = modeFeu;
 uint8_t displayStep = 0;  // Etape en cours dans l'anime (de 0 a ledsMax-1)
 e_rvb baseColor = rvb_red;  // Couleur base de l'animation
 uint16_t speedAnim = 200;
-mode_t displayMode1;
-mode_t displayMode2;
+
 byte currentAnim;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
 int  multiPush = -1;
 bool sleepOk = true;
+int modeProg = 0;
+
+mode_t displayMode1;
+mode_t displayMode2;
+
 
 // Array contenant les leds du medaillon
 WS2812rvb_t leds[ledsMAX];
 // deux leds en rab pour la programmation
-WS2812rvb_t ledsM1;
-WS2812rvb_t ledsM2;
+//WS2812rvb_t ledsM1;
+//WS2812rvb_t ledsM2;
 #include <EEPROM.h>
 
 
@@ -118,6 +123,7 @@ void loop() {
     case evInit:
       Serial.println(F("Init Ok"));
       multiPush = -1;
+      modeProg = 0;
       Events.delayedPush(5000, evStartAnim);
 
 
@@ -135,7 +141,12 @@ void loop() {
 
     case evDisplayOff:
       currentMode = modeOff;
+      Events.removeDelayEvent(evNextAnim);
+      modeProg = 0;
       break;
+
+
+
 
     // mise en route des animations
     case evStartAnim:
@@ -148,11 +159,12 @@ void loop() {
     // passage a l'animation suivante
     case evNextAnim:
       currentAnim++;
-      if (currentAnim == 3) currentAnim = 1;
+      if (currentAnim >= 3) currentAnim = 1;
       if (currentAnim == 2) {
         if (!displayMode2) currentAnim = 1;
       }
       jobStartAnim();
+      TD_println("nexted Anim", currentMode);
       break;
 
     case evNextStep:
@@ -171,12 +183,35 @@ void loop() {
 
           case evxOff:
             Serial.println(F("BP0 Up"));
+            if (modeProg == 1) {
+              D_println(displayMode1);
+              displayMode1 = (mode_t)displayMode1 + 1;
+              if (displayMode1 >= maxMode) displayMode1 = modeFeu;
+              D_println(displayMode1);
+              jobStartAnim();
+              break;
+            }
+            if (modeProg == 2) {
+              D_println(displayMode2);
+              displayMode2 = (mode_t)displayMode2 + 1;
+              if (displayMode2 >= modeTerre) displayMode2 = modeOff;
+              D_println(displayMode2);
+              jobStartAnim();
+            }
+
+
             break;
 
 
           case evxOn:
 
             Serial.print(F("BP0 Down "));
+            if (modeProg) {
+              Serial.println(F("skiped"));
+              break;
+            }
+
+
             multiPush++;
             D_println(multiPush);
 
@@ -197,10 +232,34 @@ void loop() {
             break;
 
           case evxLongOn:
-            Serial.println(F("BP0 Long On"));
-            saveDisplayMode();
-            break;
+            Serial.println(F("BP0 Long Down"));
+            //saveDisplayMode();
+            D_println(modeProg);
+            if (modeProg == 0) {
+              modeProg = 1;
+              Events.push(evStartAnim);
+              break;
+            }
+            if (modeProg == 1 and displayMode1 != modeLumiere and displayMode1 != modeTenebre ) {
+              displayMode2 = modeOff;
+              saveDisplayMode();
+              modeProg = 0;
+              Events.push(evStartAnim);
+              break;
+            }
+            if (modeProg == 1) {
+              modeProg = 2;
+              Events.push(evStartAnim);
+              break;
+            }
+            if (modeProg >= 2 ) {
 
+              saveDisplayMode();
+              modeProg = 0;
+              Events.push(evStartAnim);
+              break;
+            }
+            break;
 
           case evxLongOff:
             Serial.println(F("BP0 Long Off"));
@@ -215,7 +274,7 @@ void loop() {
 
     case evSendModeRadio: {
         TD_println("Send Current Mode ", currentMode);
-        nrfSend( (currentMode) ? 1:0) ;
+        nrfSend( (currentMode) ? 1 : 0) ;
         break;
       }
 

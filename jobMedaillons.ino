@@ -1,11 +1,20 @@
 void jobStartAnim() {
   displayStep = 0;
-//  D_println(currentAnim);
-  currentMode = displayMode1;
-  if (currentAnim == 2) {
+  if (modeProg == 1) {
+    currentMode = displayMode1;
+  } else if (modeProg == 2) {
     currentMode = displayMode2;
+  } else {
+    D_println(currentAnim);
+    currentMode = displayMode1;
+    if (currentAnim == 2) {
+      currentMode = displayMode2;
+    } else {
+      currentAnim = 1;
+    }
   }
- // TD_print("Start Anim", currentMode);
+  TD_print("jobStartAnim", currentMode);
+  D_println(displayMode1);
   Events.push(evNextStep);
   switch (currentMode) {
     case modeFeu:
@@ -36,12 +45,14 @@ void jobStartAnim() {
 }
 
 void jobNextStep() {
-  //D_println(displayStep);
+  //D_print(displayStep);
+  //D_print(currentMode);
+  //D_println(displayMode1);
   switch (currentMode) {
     case modeFeu:
       if (displayStep < 4) {
         leds[displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
-        leds[7 - displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
+        leds[6 - displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
       }
       break;
     case modeGlace:
@@ -94,7 +105,14 @@ void jobNextStep() {
 
 
   }
-  if (currentMode) {
+  if (modeProg > 0) {
+    leds[0].setcolor(rvb_blue, 100, 0, 1000);
+  }
+  if (modeProg > 1) {
+    leds[1].setcolor(rvb_blue, 100, 0, 1000);
+  }
+
+  if (currentMode or modeProg) {
     if (displayStep < ledsMAX - 1) {
       displayStep++;
       Events.delayedPush(speedAnim, evNextStep);
