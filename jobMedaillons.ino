@@ -1,11 +1,11 @@
 void jobStartAnim() {
   displayStep = 0;
-  D_println(currentAnim);
+//  D_println(currentAnim);
   currentMode = displayMode1;
   if (currentAnim == 2) {
     currentMode = displayMode2;
   }
-  TD_print("Start Anim", currentMode);
+ // TD_print("Start Anim", currentMode);
   Events.push(evNextStep);
   switch (currentMode) {
     case modeFeu:

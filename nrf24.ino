@@ -5,10 +5,10 @@ const byte radioname[6] = "Meda1";
 //construction  d'un uuid unique a partir de l'heure et la date de compil
 #define BUILDTIME __TIME__ " " __DATE__
 const byte buidtime[] = BUILDTIME;  //BUILDTIME => '15:52:28 Sep 24 2023
-const unsigned int  appUID = ((buidtime[6]+buidtime[7]) & 0x0F) |          // sec
-                           ( ((buidtime[3]+buidtime[4]) & 0x0F) << 4) |    // min
-                           ( ((buidtime[0]+buidtime[1]) & 0x0F) << 8) |    // heu
-                           ( ((buidtime[13]+buidtime[14]) & 0x0F) << 12) ;  // day
+const unsigned int  appUID = ((buidtime[6] + buidtime[7]) & 0x0F) |        // sec
+                             ( ((buidtime[3] + buidtime[4]) & 0x0F) << 4) |  // min
+                             ( ((buidtime[0] + buidtime[1]) & 0x0F) << 8) |  // heu
+                             ( ((buidtime[13] + buidtime[14]) & 0x0F) << 12) ; // day
 
 
 //* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 10 & 9 * /
@@ -21,7 +21,7 @@ struct RadioEvent  {
   byte  num;
   unsigned int  who;
   unsigned int  from;
-  
+
   byte  what;
   byte mode1;
   byte mode2;
@@ -89,12 +89,12 @@ void nrfHandle() {
 
     Serial.print("Radio\r\n[<=");
     D_print(receveRadioEvent.num);
-    TD_print("Who",receveRadioEvent.who);
-    TD_print("From",receveRadioEvent.from);
-    TD_print("What",receveRadioEvent.what);
-    TD_print("Mode1",receveRadioEvent.mode1);
-    TD_print("Mode2",receveRadioEvent.mode2);
-    
+    TD_print("Who", receveRadioEvent.who);
+    TD_print("From", receveRadioEvent.from);
+    TD_print("What", receveRadioEvent.what);
+    TD_print("Mode1", receveRadioEvent.mode1);
+    TD_print("Mode2", receveRadioEvent.mode2);
+
 
     Serial.print("] ");
     if (receveRadioEvent.who == appUID) {
@@ -104,18 +104,22 @@ void nrfHandle() {
         Serial.println("dub");
       } else {
         messNum = receveRadioEvent.num;
-        if (receveRadioEvent.what == 1) {
+        if (receveRadioEvent.what == 1 or receveRadioEvent.what == 0) {
           displayMode1 = receveRadioEvent.mode1;
           displayMode2 = receveRadioEvent.mode2;
           currentMode = 0;
+          if (receveRadioEvent.what) currentMode = receveRadioEvent.mode1;
           TD_print("Distant Mode1", displayMode1);
           TD_println("Mode2", displayMode2);
-          Events.push(evStartAnim);
+          Events.removeDelayEvent(evNextAnim);
+          if (currentMode) Events.push(evStartAnim);
+
+
         }
         if (receveRadioEvent.what == evWhoIsHere) {
-       
+
           TD_println("Request Who is there", appUID);
-          Events.delayedPush(random(110,150),evIamHere);
+          Events.delayedPush(random(110, 150), evIamHere);
         }
         Events.delayedPush(random(2, 11), evAckRadio);
       }
@@ -131,7 +135,7 @@ void nrfAck() {
   Serial.println("send ack");
   bool SD13 = digitalRead(13);
   radio.enableSPI();
-  receveRadioEvent.from=appUID;
+  receveRadioEvent.from = appUID;
   radio.stopListening();
   radio.write( &receveRadioEvent, sizeof(receveRadioEvent), true );
   radio.startListening();
@@ -141,11 +145,11 @@ void nrfAck() {
 }
 
 void  nrfSend(byte what) {
-  TD_print("Send UUID",appUID);
-  TD_print(,what);
+  TD_print("Send UUID", appUID);
+  TD_print(, what);
   transmitRadioEvent.num = ++messNum;
   transmitRadioEvent.who = appUID;
-  transmitRadioEvent.from=appUID;
+  transmitRadioEvent.from = appUID;
   transmitRadioEvent.what = what;
   transmitRadioEvent.mode1 = displayMode1;
   transmitRadioEvent.mode2 = displayMode2;

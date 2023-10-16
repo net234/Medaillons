@@ -142,6 +142,7 @@ void loop() {
       if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
       currentAnim = 0;
       jobStartAnim();
+      TD_println("Started Anim", currentMode);
       break;
 
     // passage a l'animation suivante
@@ -214,7 +215,7 @@ void loop() {
 
     case evSendModeRadio: {
         TD_println("Send Current Mode ", currentMode);
-        nrfSend(1);
+        nrfSend( (currentMode) ? 1:0) ;
         break;
       }
 
