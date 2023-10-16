@@ -32,7 +32,7 @@
 #include "nano.h"
 
 
-#define APP_VERSION "Medaillon V1.1"
+#define APP_VERSION "Medaillon V1.2"
 
 //enum typeEvent { evNill=0, ev100Hz, ev10Hz, ev1Hz, ev24H, evInChar,evInString,evUser=99 };
 enum myEvent {
