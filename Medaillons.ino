@@ -39,12 +39,13 @@ enum myEvent {
   evBP0 = 100,
   evLed0,
   //evSaveDisplayMode,
-  evDisplayOff,
-  evStartAnim,
-  evNextAnim,
-  evAckRadio,
-  evWhoIsHere,
-  evIamHere,
+  evDisplayOff,  //Extinction
+  evStartAnim,   //Allumage Avec l'animation Mode1 et activation de l'extinction automatique
+  evNextAnim,    //L'anime est fini on repete ou on fait la suivante
+  evNextStep,    //etape suivante dans l'animation
+  evAckRadio,    //Ack d'un event radio
+  evWhoIsHere,   //Demande radio d'identification
+  evIamHere,     //Identification par radio
 };
 
 // Gestionaire d'evenemnt
@@ -58,26 +59,27 @@ const uint8_t  ledsMAX = 7;  // nombre de led sur le bandeau
 const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = pas d'autoextinction)
 // varibale modifiables (fin)
 
-// Array contenant les leds du medaillon
+
 
 
 
 
 
 enum mode_t { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, maxMode}  currentMode = modeFeu;
-uint8_t displayStep = 0;  // Etape en cours dans l'anime
+uint8_t displayStep = 0;  // Etape en cours dans l'anime (de 0 a ledsMax-1)
 e_rvb baseColor = rvb_red;  // Couleur base de l'animation
-//uint16_t dureeAnim
 uint16_t speedAnim = 200;
 mode_t displayMode1;
 mode_t displayMode2;
-byte currentAnime;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
+byte currentAnim;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
 
 bool sleepOk = true;
 
-
-WS2812rvb_t leds[ledsMAX + 1];
-
+// Array contenant les leds du medaillon
+WS2812rvb_t leds[ledsMAX];
+// deux leds en rab pour la programmation
+WS2812rvb_t ledsM1;
+WS2812rvb_t ledsM2;
 #include <EEPROM.h>
 
 
@@ -88,13 +90,17 @@ void setup() {
   Events.begin();
   Serial.println(F(APP_VERSION));
 
+
+  //  toute les led a blanc a l'init
   pinMode(PIN_WS2812, OUTPUT);
   for (uint8_t N = 0; N < ledsMAX; N++) {
     leds[N].setcolor(rvb_white, 80, 2000, 2000);
   }
 
+  // recup des modes memorises (mode1 et mode2)
   getDisplayMode();
 
+  // init du module radio
   nrfSetup();
 }
 
@@ -110,8 +116,9 @@ void loop() {
 
     case evInit:
       Serial.println(F("Init Ok"));
+
       Events.delayedPush(5000, evStartAnim);
-      if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay + 5000, evDisplayOff);
+
 
       break;
 
@@ -129,15 +136,26 @@ void loop() {
       currentMode = modeOff;
       break;
 
+    // mise en route des animations
     case evStartAnim:
       if (autoOffDelay) Events.delayedPush(1000L * autoOffDelay, evDisplayOff);
-      startAnim();
+      currentAnim = 0;
+      jobStartAnim();
       break;
 
+    // passage a l'animation suivante
     case evNextAnim:
-      nextAnim();
+      currentAnim++;
+      if (currentAnim == 3) currentAnim = 1;
+      if (currentAnim == 2) {
+        if (!displayMode2) currentAnim = 1;
+      }
+      jobStartAnim();
       break;
 
+    case evNextStep:
+      jobNextStep();
+      break;
 
     case evIamHere:
       Serial.println(F("Send evIamHere"));
@@ -200,7 +218,7 @@ void loop() {
           displayMode2 = modeTerre;
         }
 
-      
+
         if (Keyboard.inputChar == 'S') {
           sleepOk = !sleepOk;
           D_println(sleepOk);
@@ -223,155 +241,4 @@ void loop() {
 
 
   //delay(1);
-}
-
-void startAnim() {
-  displayStep = 0;
-  D_println(currentAnime);
-  currentAnime++;
-  currentMode = displayMode1;
-  if (currentAnime == 2) {
-    currentAnime = 0;
-    if (displayMode2) currentMode = displayMode2;
-  }
-  TD_print("Start Anim",currentMode);
-  D_println(currentAnime);
-  Events.push(evNextAnim);
-  switch (currentMode) {
-    case modeFeu:
-      baseColor = rvb_red;
-      speedAnim = 300;
-      break;
-    case modeGlace:
-      baseColor = rvb_blue;
-      speedAnim = 800;
-      break;
-    case modeVent:
-      baseColor = rvb_green;
-      speedAnim = 80;
-      break;
-    case modeTerre:
-      baseColor = rvb_brown;
-      speedAnim = 300;
-      break;
-    case modeLumiere:
-      baseColor = rvb_white;
-      speedAnim = 300;
-      break;
-    case modeTenebre:
-      baseColor = rvb_purple;
-      speedAnim = 500;
-      break;
-
-
-  }
-}
-
-void nextAnim() {
-  //D_println(displayStep);
-  switch (currentMode) {
-    case modeFeu:
-      if (displayStep < 4) {
-        leds[displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
-        leds[7 - displayStep].setcolor(baseColor, 80, speedAnim * 1, speedAnim * 2);
-      }
-      break;
-    case modeGlace:
-      if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 90, speedAnim * 6, speedAnim * 1);
-        }
-
-      }
-
-      break;
-    case modeVent:
-      leds[displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
-      break;
-
-    case modeTerre:
-
-      if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N += 2) {
-          leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 2);
-        }
-      }
-      if (displayStep == 4) {
-        for (uint8_t N = 1; N < ledsMAX; N += 2) {
-          leds[N].setcolor(baseColor, 90, speedAnim * 2, speedAnim * 1);
-        }
-
-      }
-
-      break;
-
-    case modeLumiere:
-      leds[6 - displayStep].setcolor(baseColor, 100, speedAnim * 2, speedAnim * 1);
-
-      //      if (displayStep == 0) {
-      //        for (uint8_t N = 0; N < ledsMAX; N++) {
-      //          leds[N].setcolor(baseColor, 100,  speedAnim * 5, 1);
-      //        }
-      //
-      //     }
-      break;
-
-    case modeTenebre:
-      if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 100, speedAnim, speedAnim * 5);
-        }
-
-      }      break;
-
-
-  }
-  if (currentMode) {
-    if (displayStep < ledsMAX-1) {
-      displayStep++;
-      Events.delayedPush(speedAnim, evNextAnim);
-    } else {
-      Events.delayedPush(speedAnim, evStartAnim);
-    }
-  }
-
-}
-
-
-
-void  getDisplayMode() {
-  // lecture de  l'EEPROM pour le choix de l'animation
-  currentMode = 0;
-  displayMode1 = modeLumiere;
-  displayMode2 = modeOff;
-  // check if a stored value
-  if (EEPROM.read(1) == 'B') {
-    displayMode1 = (mode_t)EEPROM.read(2);
-    if (displayMode1 == 0 or displayMode1 > maxMode) displayMode1 = modeLumiere;
-    TD_println("Saved displayMode1", displayMode1);
-    displayMode2 = (mode_t)EEPROM.read(3);
-    if (displayMode2 > maxMode) displayMode2 = modeOff;
-    TD_println("Saved displayMode2", displayMode2);
-  }
-}
-
-void saveDisplayMode() {
-  EEPROM.update(1, 'B');
-  EEPROM.update(2, displayMode1);
-  TD_println("Save displayMode1 ", displayMode1);
-  EEPROM.update(3, displayMode2);
-  TD_println("Save displayMode2 ", displayMode2);
-}
-
-// 100 HZ
-void jobRefreshLeds(const uint8_t delta) {
-  for (int8_t N = 0; N < ledsMAX; N++) {
-    leds[N].write();
-  }
-  leds[0].reset(); // obligatoire
-
-  for (uint8_t N = 0; N < ledsMAX; N++) {
-    leds[N].anime(delta);
-  }
-
 }
