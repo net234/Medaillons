@@ -43,6 +43,7 @@ enum myEvent {
   evStartAnim,   //Allumage Avec l'animation Mode1 et activation de l'extinction automatique
   evNextAnim,    //L'anime est fini on repete ou on fait la suivante
   evNextStep,    //etape suivante dans l'animation
+  evSendModeRadio, // send actual mode
   evAckRadio,    //Ack d'un event radio
   evWhoIsHere,   //Demande radio d'identification
   evIamHere,     //Identification par radio
@@ -72,7 +73,7 @@ uint16_t speedAnim = 200;
 mode_t displayMode1;
 mode_t displayMode2;
 byte currentAnim;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
-
+int  multiPush = -1;
 bool sleepOk = true;
 
 // Array contenant les leds du medaillon
@@ -116,7 +117,7 @@ void loop() {
 
     case evInit:
       Serial.println(F("Init Ok"));
-
+      multiPush = -1;
       Events.delayedPush(5000, evStartAnim);
 
 
@@ -174,18 +175,23 @@ void loop() {
 
           case evxOn:
 
-            Serial.println(F("BP0 Down"));
-            if (currentMode) {
-              currentMode = modeOff;
-            } else {
-              currentMode = displayMode1;
+            Serial.print(F("BP0 Down "));
+            multiPush++;
+            D_println(multiPush);
+
+            if (multiPush == 1 or multiPush == 2) {
+              if (currentMode) {
+                currentMode = modeOff;
+              } else {
+                currentMode = displayMode1;
+              }
+              Events.removeDelayEvent(evNextAnim);
+              if (currentMode) Events.push(evStartAnim);
+
             }
-
-            Events.removeDelayEvent(evNextAnim);
-            if (currentMode) Events.push(evStartAnim);
-            TD_println("Current Mode ", currentMode);
-            nrfSend(1);
-
+            if (multiPush == 2) {
+              Events.push(evSendModeRadio);
+            }
 
             break;
 
@@ -195,9 +201,24 @@ void loop() {
             break;
 
 
+          case evxLongOff:
+            Serial.println(F("BP0 Long Off"));
+            multiPush = 0;
+            break;
+
+
+
         }
         break;
       }
+
+    case evSendModeRadio: {
+        TD_println("Send Current Mode ", currentMode);
+        nrfSend(1);
+        break;
+      }
+
+
     case evAckRadio: {
         nrfAck();
         break;
