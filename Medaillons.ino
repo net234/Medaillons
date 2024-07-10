@@ -24,15 +24,19 @@
    - Full rebuild from Bandeau  01/2021 net234
    V1.1 (29/09/2022)
    - Ajustement pour version Meluze
+   - Taged V1.2 
+   V1.3 (10/09/20)
+   - ajout de l'option NO_NRF pour une version stand alone
 
 *************************************************/
 
+#define NO_NRF  // remove NRF
 
 #include <Arduino.h>
 #include "nano.h"
 
 
-#define APP_VERSION "Medaillon V1.2"
+#define APP_VERSION "Medaillon V1.3"
 
 //enum typeEvent { evNill=0, ev100Hz, ev10Hz, ev1Hz, ev24H, evInChar,evInString,evUser=99 };
 enum myEvent {
@@ -43,11 +47,12 @@ enum myEvent {
   evStartAnim,   //Allumage Avec l'animation Mode1 et activation de l'extinction automatique
   evNextAnim,    //L'anime est fini on repete ou on fait la suivante
   evNextStep,    //etape suivante dans l'animation
-  //evModeProg1,    // choix du programe1
-  evSendModeRadio, // send actual mode
-  evAckRadio,    //Ack d'un event radio
-  evWhoIsHere,   //Demande radio d'identification
-  evIamHere,     //Identification par radio
+#ifndef NO_NRF
+  evSendModeRadio,  // send actual mode
+  evAckRadio,       //Ack d'un event radio
+  evWhoIsHere,      //Demande radio d'identification
+  evIamHere,        //Identification par radio
+#endif
 };
 
 // Gestionaire d'evenemnt
@@ -57,8 +62,8 @@ enum myEvent {
 
 
 // varibale modifiables
-const uint8_t  ledsMAX = 7;  // nombre de led sur le bandeau
-const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = pas d'autoextinction)
+const uint8_t ledsMAX = 7;        // nombre de led sur le bandeau
+const uint8_t autoOffDelay = 60;  // delais d'auto extinction en secondes (0 = pas d'autoextinction)
 // varibale modifiables (fin)
 
 
@@ -67,13 +72,20 @@ const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = 
 
 
 
-enum mode_t : byte { modeOff, modeFeu, modeGlace, modeVent, modeTerre, modeLumiere, modeTenebre, maxMode}  currentMode = modeFeu;
-uint8_t displayStep = 0;  // Etape en cours dans l'anime (de 0 a ledsMax-1)
+enum mode_t : byte { modeOff,
+                     modeFeu,
+                     modeGlace,
+                     modeVent,
+                     modeTerre,
+                     modeLumiere,
+                     modeTenebre,
+                     maxMode } currentMode = modeFeu;
+uint8_t displayStep = 0;    // Etape en cours dans l'anime (de 0 a ledsMax-1)
 e_rvb baseColor = rvb_red;  // Couleur base de l'animation
 uint16_t speedAnim = 200;
 
 byte currentAnim;  // 0 a l'init 1 pour l'anime1  2 pour l'anime2
-int  multiPush = -1;
+int multiPush = -1;
 bool sleepOk = true;
 int modeProg = 0;
 
@@ -83,9 +95,7 @@ mode_t displayMode2;
 
 // Array contenant les leds du medaillon
 WS2812rvb_t leds[ledsMAX];
-// deux leds en rab pour la programmation
-//WS2812rvb_t ledsM1;
-//WS2812rvb_t ledsM2;
+
 #include <EEPROM.h>
 
 
@@ -105,18 +115,21 @@ void setup() {
 
   // recup des modes memorises (mode1 et mode2)
   getDisplayMode();
-
+#ifndef NO_NRF
   // init du module radio
   nrfSetup();
+#endif
 }
 
 
 
 // the loop function runs over and over again forever
 void loop() {
+#ifndef NO_NRF
   nrfHandle();
-  Events.get(sleepOk);     // get standart event
-  Events.handle();  // handle standart event
+#endif
+  Events.get(sleepOk);  // get standart event
+  Events.handle();      // handle standart event
 
   switch (Events.code) {
 
@@ -171,13 +184,17 @@ void loop() {
       jobNextStep();
       break;
 
+
+
+#ifndef NO_NRF
     case evIamHere:
       Serial.println(F("Send evIamHere"));
       nrfSend(evIamHere);
       break;
+#endif
 
-
-    case evBP0: {
+    case evBP0:
+      {
 
         switch (Events.ext) {
 
@@ -223,12 +240,12 @@ void loop() {
               }
               Events.removeDelayEvent(evNextAnim);
               if (currentMode) Events.push(evStartAnim);
-
             }
+#ifndef NO_NRF
             if (multiPush == 2) {
               Events.push(evSendModeRadio);
             }
-
+#endif
             break;
 
           case evxLongOn:
@@ -240,7 +257,7 @@ void loop() {
               Events.push(evStartAnim);
               break;
             }
-            if (modeProg == 1 and displayMode1 != modeLumiere and displayMode1 != modeTenebre ) {
+            if (modeProg == 1 and displayMode1 != modeLumiere and displayMode1 != modeTenebre) {
               displayMode2 = modeOff;
               saveDisplayMode();
               modeProg = 0;
@@ -252,7 +269,7 @@ void loop() {
               Events.push(evStartAnim);
               break;
             }
-            if (modeProg >= 2 ) {
+            if (modeProg >= 2) {
 
               saveDisplayMode();
               modeProg = 0;
@@ -265,30 +282,31 @@ void loop() {
             Serial.println(F("BP0 Long Off"));
             multiPush = 0;
             break;
-
-
-
         }
         break;
       }
-
-    case evSendModeRadio: {
+#ifndef NO_NRF
+    case evSendModeRadio:
+      {
         TD_println("Send Current Mode ", currentMode);
-        nrfSend( (currentMode) ? 1 : 0) ;
+        nrfSend((currentMode) ? 1 : 0);
         break;
       }
 
 
-    case evAckRadio: {
+    case evAckRadio:
+      {
         nrfAck();
         break;
       }
-    case evWhoIsHere: {
+    case evWhoIsHere:
+      {
         nrfSend(evWhoIsHere);
         break;
       }
-
-    case evInChar: {
+#endif
+    case evInChar:
+      {
         if (Keyboard.inputChar == '1') {
           displayMode1 = modeLumiere;
           displayMode2 = modeVent;
@@ -304,6 +322,7 @@ void loop() {
           sleepOk = !sleepOk;
           D_println(sleepOk);
         }
+#ifndef NO_NRF
         if (Keyboard.inputChar == 'W') {
 
           T_println("Who ?");
@@ -315,7 +334,7 @@ void loop() {
           TD_println("Current Mode ", currentMode);
           nrfSend(1);
         }
-
+#endif
         break;
       }
   }
