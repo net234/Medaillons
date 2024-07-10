@@ -202,7 +202,7 @@ void loop() {
             Serial.println(F("BP0 Up"));
             if (modeProg == 1) {
               D_println(displayMode1);
-              displayMode1 = (mode_t)displayMode1 + 1;
+              displayMode1 = (mode_t)(displayMode1 + 1);
               if (displayMode1 >= maxMode) displayMode1 = modeFeu;
               D_println(displayMode1);
               jobStartAnim();
@@ -210,7 +210,7 @@ void loop() {
             }
             if (modeProg == 2) {
               D_println(displayMode2);
-              displayMode2 = (mode_t)displayMode2 + 1;
+              displayMode2 = (mode_t)(displayMode2 + 1);
               if (displayMode2 >= modeTerre) displayMode2 = modeOff;
               D_println(displayMode2);
               jobStartAnim();

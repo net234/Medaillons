@@ -143,7 +143,7 @@ void jobRefreshLeds(const uint8_t delta) {
 
 void  getDisplayMode() {
   // lecture de  l'EEPROM pour le choix de l'animation
-  currentMode = 0;
+  currentMode = modeOff;
   displayMode1 = modeLumiere;
   displayMode2 = modeOff;
   // check if a stored value
