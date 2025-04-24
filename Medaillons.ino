@@ -24,6 +24,9 @@
    - Full rebuild from Bandeau  01/2021 net234
    V1.1 (29/09/2022)
    - Ajustement pour version Meluze
+   V1.2 (29/09/2022)
+   - Ajout de la possibilité d'utiliser la magie des ténèbres et lumineuse en magie secondaire.
+   - Ajustement de la magie des ténèbres et des durées des animations des différentes magies
 
 *************************************************/
 
@@ -57,7 +60,7 @@ enum myEvent {
 
 
 // varibale modifiables
-const uint8_t  ledsMAX = 7;  // nombre de led sur le bandeau
+const uint8_t ledsMAX = 7;  // nombre de led sur le bandeau
 const uint8_t autoOffDelay = 60;   // delais d'auto extinction en secondes (0 = pas d'autoextinction)
 // varibale modifiables (fin)
 
@@ -194,7 +197,7 @@ void loop() {
             if (modeProg == 2) {
               D_println(displayMode2);
               displayMode2 = (mode_t)displayMode2 + 1;
-              if (displayMode2 >= modeTerre) displayMode2 = modeOff;
+              if (displayMode2 >= maxMode) displayMode2 = modeOff;
               D_println(displayMode2);
               jobStartAnim();
             }

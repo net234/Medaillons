@@ -23,11 +23,11 @@ void jobStartAnim() {
       break;
     case modeGlace:
       baseColor = rvb_blue;
-      speedAnim = 800;
+      speedAnim = 300;
       break;
     case modeVent:
       baseColor = rvb_green;
-      speedAnim = 80;
+      speedAnim = 300;
       break;
     case modeTerre:
       baseColor = rvb_brown;
@@ -39,7 +39,7 @@ void jobStartAnim() {
       break;
     case modeTenebre:
       baseColor = rvb_purple;
-      speedAnim = 500;
+      speedAnim = 300;
       break;
   }
 }
@@ -95,13 +95,12 @@ void jobNextStep() {
       //     }
       break;
 
-    case modeTenebre:
-      if (displayStep == 0) {
-        for (uint8_t N = 0; N < ledsMAX; N++) {
-          leds[N].setcolor(baseColor, 100, speedAnim, speedAnim * 5);
-        }
-
-      }      break;
+    case modeTenebre:  
+      if (displayStep % 2 == 0) {
+        leds[displayStep].setcolor(baseColor, 100, speedAnim * 1, speedAnim * 2);
+        leds[(displayStep+3)%(ledsMAX-1)].setcolor(baseColor, 100, speedAnim * 1, speedAnim * 2);
+      }
+      break;
 
 
   }
